@@ -13,7 +13,7 @@ using Player = Exiled.Events.Handlers.Player;
 namespace UltimateAFK
 {
     /// <summary>
-    /// Main class where all the handlers are loaded. a
+    /// Main class where all the handlers are loaded.
     /// </summary>
     public class UltimateAFK : Plugin<Config>
     {

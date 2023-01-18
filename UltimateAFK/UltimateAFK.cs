@@ -23,7 +23,7 @@ namespace UltimateAFK
         public override string Prefix { get; } = "ultimate_afk";
         
         public override Version Version { get; } = new Version(6, 1, 0);
-        public override Version RequiredExiledVersion { get; } = new Version(6, 0, 0);
+        public override Version RequiredExiledVersion { get; } = new Version(6, 0, 1);
         public MainHandler MainHandler { get; private set; }
         
         public override void OnEnabled()
@@ -31,7 +31,7 @@ namespace UltimateAFK
             Singleton = this;
             MainHandler = new MainHandler(this);
             
-            if (ConfigFile.ServerConfig.GetInt("afk_time") > 0)
+            if (ConfigFile.ServerConfig.GetFloat("afk_time", 90f) > 0)
             {
                 Exiled.API.Features.Log.Warn($"You have enabled the AFK detector of the base game, please disable it by setting &6afk_time = 0&r in &4config_gameplay.txt&r");
             }

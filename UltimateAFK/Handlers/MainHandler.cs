@@ -26,11 +26,11 @@ namespace UltimateAFK.Handlers
         }
 
         #endregion
-        
+
         /// <summary>
         /// A dictionary where replacement players are stored to give them the stats and items of the original player.
         /// </summary>
-        public static Dictionary<Exiled.API.Features.Player, AFKData> ReplacingPlayers = new();
+        public static Dictionary<Exiled.API.Features.Player, AFKData> ReplacingPlayers;
 
         /// <summary>
         /// When a player joins I give him the component.
@@ -62,7 +62,7 @@ namespace UltimateAFK.Handlers
             }
             catch (System.Exception e)
             {
-                Log.Error($"Error on {GetType().Name} (OnChangingRole) || {e} {e.StackTrace}");
+                Log.Error($"Error on {GetType().Name} {nameof(OnChangingRole)} | {e.Data} {e.StackTrace} | Player is null {ev.Player is null} | List is null{ReplacingPlayers is null} | Instance is null {Plugin is null}");
             }
         }
 

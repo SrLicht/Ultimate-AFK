@@ -36,6 +36,8 @@ namespace UltimateAFK
                 Exiled.API.Features.Log.Warn($"You have enabled the AFK detector of the base game, please disable it by setting &6afk_time = 0&r in &4config_gameplay.txt&r");
             }
 
+            MainHandler.ReplacingPlayers = new Dictionary<Exiled.API.Features.Player, AFKData>();
+            
             Player.ChangingRole += MainHandler.OnChangingRole;
             Player.Verified += MainHandler.OnPlayerJoin;
             Player.Dying += MainHandler.OnPlayerDeath;

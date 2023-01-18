@@ -1,16 +1,17 @@
 ﻿using System.Collections.Generic;
 using System.ComponentModel;
+using Exiled.API.Interfaces;
 using PlayerRoles;
 
 namespace UltimateAFK
 {
-    public class Config
+    public class Config : IConfig
     {
         [Description("Setting this to false will stop the plugin from working in the next round.")]
         public bool IsEnabled { get; set; } = true;
 
         [Description("If you have any error in the plugin operation activate this and create an Issue in Github https://github.com/SrLicht/Ultimate-AFK/issues")]
-        public bool DebugMode { get; set; } = false;
+        public bool Debug { get; set; } = false;
 
         [Description("This bool activates the logs that easily spams the console, and normally they are not required, that's why they have this separate configuration :)")]
         public bool SpamLogs { get; set; } = false;

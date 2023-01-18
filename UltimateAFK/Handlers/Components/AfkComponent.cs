@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
+using Exiled.API.Features;
+using Exiled.Permissions.Extensions;
 using MEC;
-using NWAPIPermissionSystem;
 using PlayerRoles;
 using PlayerRoles.PlayableScps.Scp079;
 using PlayerRoles.PlayableScps.Scp096;
-using PluginAPI.Core;
 using UltimateAFK.Resources;
 using UnityEngine;
 
@@ -30,15 +30,15 @@ namespace UltimateAFK.Handlers.Components
             Owner = ply;
             // Coroutine dies when the component or the ReferenceHub (Player) is destroyed.
             _checkHandle = Timing.RunCoroutine(Check().CancelWith(this).CancelWith(gameObject));
-            Log.Debug($"Component full loaded Owner: {Owner.Nickname} ({Owner.UserId})", UltimateAFK.Singleton.Config.DebugMode);
+            Log.Debug($"Component full loaded Owner: {Owner.Nickname} ({Owner.UserId})");
         }
         
         private void OnDestroy()
         {
-            Log.Debug($"Calling OnDestroy", UltimateAFK.Singleton.Config.DebugMode);
+            Log.Debug($"Calling OnDestroy");
 
             if (Owner is null)
-                Log.Debug("Owner was null at the time of destroying the component", UltimateAFK.Singleton.Config.DebugMode);
+                Log.Debug("Owner was null at the time of destroying the component");
 
             Timing.KillCoroutines(_checkHandle);
         }
@@ -57,7 +57,7 @@ namespace UltimateAFK.Handlers.Components
             {
                 yield return Timing.WaitForSeconds(1.3f);
                 
-                Log.Debug("Calling CheckAFK", UltimateAFK.Singleton.Config.DebugMode && UltimateAFK.Singleton.Config.SpamLogs);
+                Log.Debug("Calling CheckAFK");
                 try
                 {
                     CheckAfk();
@@ -80,9 +80,10 @@ namespace UltimateAFK.Handlers.Components
                 return;
             }
 
+            
             var ownerPosition = Owner.Position;
-            var cameraPosition = Owner.ReferenceHub.roleManager.CurrentRole is Scp079Role scp079 ? scp079.CurrentCamera.CameraPosition : Owner.Camera.position;
-            var cameraRotation = Owner.ReferenceHub.roleManager.CurrentRole is Scp079Role scp0792 ? new Quaternion(scp0792.CurrentCamera.HorizontalRotation, scp0792.CurrentCamera.VerticalRotation, scp0792.CurrentCamera.RollRotation, 0f ) : Owner.Camera.rotation;
+            var cameraPosition = Owner.Role is Exiled.API.Features.Roles.Scp079Role scp079 ? scp079.Camera.Position : Owner.CameraTransform.position;
+            var cameraRotation = Owner.Role is Exiled.API.Features.Roles.Scp079Role scp0792 ? new Quaternion(scp0792.Camera.Rotation.x, scp0792.Camera.Rotation.y, scp0792.Camera.Rotation.z, 0f ) : Owner.CameraTransform.rotation;
             
             // Set OwnerRoleType 
             OwnerRoleType = Owner.Role;
@@ -96,9 +97,9 @@ namespace UltimateAFK.Handlers.Components
                 OwnerLastPosition = ownerPosition;
             }
             // The player is not moving and is not SCP-096 with his TryToNotCry ability.
-            else if (!(Owner.Role == RoleTypeId.Scp096 && (Owner.ReferenceHub.roleManager.CurrentRole as Scp096Role).IsAbilityState(Scp096AbilityState.TryingNotToCry)))
+            else if (!(Owner.Role == RoleTypeId.Scp096 && (Owner.Role.Base as Scp096Role).IsAbilityState(Scp096AbilityState.TryingNotToCry)))
             {
-                Log.Debug($"{Owner.Nickname} is in not moving, AFKTime: {_afkTime}", UltimateAFK.Singleton.Config.DebugMode);
+                Log.Debug($"{Owner.Nickname} is in not moving, AFKTime: {_afkTime}");
 
                 if(_afkTime++ < UltimateAFK.Singleton.Config.AfkTime) return;
 
@@ -107,7 +108,7 @@ namespace UltimateAFK.Handlers.Components
                 if (graceNumb > 0)
                 {
                     // The player is in grace time, so let's warn him that he has been afk for too long.
-                    Owner.SendBroadcast(string.Format(UltimateAFK.Singleton.Config.MsgGrace, graceNumb), 2,
+                    Owner.Broadcast( 2,string.Format(UltimateAFK.Singleton.Config.MsgGrace, graceNumb),
                         shouldClearPrevious: true);
                 }
                 else
@@ -158,7 +159,7 @@ namespace UltimateAFK.Handlers.Components
         /// <returns>True if all requirements are met</returns>
         private bool Continue(Player ply)
         {
-            return ply.IsAlive && Round.IsRoundStarted && Player.Count >= UltimateAFK.Singleton.Config.MinPlayers &&
+            return ply.IsAlive && Round.IsStarted && Player.Dictionary.Count >= UltimateAFK.Singleton.Config.MinPlayers &&
                    (Owner.Role != RoleTypeId.Tutorial || !UltimateAFK.Singleton.Config.IgnoreTut);
         }
         
@@ -174,10 +175,10 @@ namespace UltimateAFK.Handlers.Components
                 // Check if role is blacklisted
                 if (UltimateAFK.Singleton.Config.RoleTypeBlacklist?.Count > 0 && UltimateAFK.Singleton.Config.RoleTypeBlacklist.Contains(roleType))
                 {
-                    Log.Debug($"player {ply.Nickname} ({ply.UserId}) has a role that is blacklisted so he will not be searched for a replacement player", UltimateAFK.Singleton.Config.DebugMode);
+                    Log.Debug($"player {ply.Nickname} ({ply.UserId}) has a role that is blacklisted so he will not be searched for a replacement player");
                     
                     ply.ClearInventory();
-                    ply.SetRole(RoleTypeId.Spectator);
+                    ply.Role.Set(RoleTypeId.Spectator);
                 
                     if (IsKickEnabled)
                     {
@@ -191,7 +192,7 @@ namespace UltimateAFK.Handlers.Components
                         }
                     }
                 
-                    ply.SendBroadcast(UltimateAFK.Singleton.Config.MsgFspec, 30, shouldClearPrevious: true);
+                    ply.Broadcast(30, UltimateAFK.Singleton.Config.MsgFspec, shouldClearPrevious: true);
                     ply.SendConsoleMessage(UltimateAFK.Singleton.Config.MsgFspec, "white");
                     return;
                 }
@@ -202,10 +203,10 @@ namespace UltimateAFK.Handlers.Components
                 // If replacement is null
                 if (replacement is null)
                 {
-                    Log.Debug("Unable to find replacement player, moving to spectator...", UltimateAFK.Singleton.Config.DebugMode);
+                    Log.Debug("Unable to find replacement player, moving to spectator...");
                     
                     ply.ClearInventory();
-                    ply.SetRole(RoleTypeId.Spectator);
+                    ply.Role.Set(RoleTypeId.Spectator);
 
                     if (IsKickEnabled)
                     {
@@ -221,13 +222,13 @@ namespace UltimateAFK.Handlers.Components
                         }
                     }
 
-                    ply.SendBroadcast(UltimateAFK.Singleton.Config.MsgFspec, 30, shouldClearPrevious: true);
+                    ply.Broadcast(30, UltimateAFK.Singleton.Config.MsgFspec, shouldClearPrevious: true);
                     ply.SendConsoleMessage(UltimateAFK.Singleton.Config.MsgFspec, "white");
                 }
                 else
                 {
                     // if not
-                    Log.Debug($"Replacement Player found: {replacement.Nickname} ({replacement.UserId})", UltimateAFK.Singleton.Config.DebugMode);
+                    Log.Debug($"Replacement Player found: {replacement.Nickname} ({replacement.UserId})");
 
                     // Check if AFK role is SCP-079 
                     if (roleType is RoleTypeId.Scp079)
@@ -236,7 +237,7 @@ namespace UltimateAFK.Handlers.Components
                         AddData(ply, replacement, true);
                 
                         // Self-explanatory
-                        ply.SetRole(RoleTypeId.Spectator);
+                        ply.Role.Set(RoleTypeId.Spectator);
                 
                         if (IsKickEnabled)
                         {
@@ -249,17 +250,17 @@ namespace UltimateAFK.Handlers.Components
 
                                 ply.Kick(UltimateAFK.Singleton.Config.MsgKick);
 
-                                replacement.SetRole(roleType);
+                                replacement.Role.Set(roleType);
                                 return;
                             }
                         }
 
                         //Send player a broadcast for being too long afk
-                        ply.SendBroadcast(UltimateAFK.Singleton.Config.MsgFspec, 30, shouldClearPrevious: true);
+                        ply.Broadcast(30, UltimateAFK.Singleton.Config.MsgFspec, shouldClearPrevious: true);
                         ply.SendConsoleMessage(UltimateAFK.Singleton.Config.MsgFspec, "white");
                 
                         // Sends replacement to the role that had the afk
-                        replacement.SetRole(roleType);
+                        replacement.Role.Set(roleType);
                     }
                     else
                     {
@@ -277,7 +278,7 @@ namespace UltimateAFK.Handlers.Components
 
                                 ply.Kick(UltimateAFK.Singleton.Config.MsgKick);
 
-                                replacement.SetRole(roleType);
+                                replacement.Role.Set(roleType);
                                 return;
                             }
                         }
@@ -285,12 +286,12 @@ namespace UltimateAFK.Handlers.Components
                         // Clear player inventory
                         ply.ClearInventory();
                         //Send player a broadcast for being too long afk
-                        ply.SendBroadcast(UltimateAFK.Singleton.Config.MsgFspec, 25, shouldClearPrevious: true);
+                        ply.Broadcast( 25, UltimateAFK.Singleton.Config.MsgFspec, shouldClearPrevious: true);
                         ply.SendConsoleMessage(UltimateAFK.Singleton.Config.MsgFspec, "white");
                         // Sends player to spectator
-                        ply.SetRole(RoleTypeId.Spectator);
+                        ply.Role.Set(RoleTypeId.Spectator);
                         // Sends replacement to the role that had the afk
-                        replacement.SetRole(roleType);
+                        replacement.Role.Set(roleType);
                     }
                 }
             }
@@ -305,9 +306,9 @@ namespace UltimateAFK.Handlers.Components
         /// </summary>
         private Player GetReplacement()
         {
-            foreach (var player in Player.GetPlayers())
+            foreach (var player in Player.List)
             {
-                if (player.IsAlive || player == Owner || player.CheckPermission("uafk.ignore") || player.IsServer || player.UserId.Contains("@server"))
+                if (player.IsAlive || player == Owner || player.CheckPermission("uafk.ignore")  || player.UserId.Contains("@server"))
                     continue;
 
                 return player;
@@ -325,7 +326,7 @@ namespace UltimateAFK.Handlers.Components
             {
                 if (is079)
                 {
-                    if (player.RoleBase is Scp079Role scp079Role && scp079Role.SubroutineModule.TryGetComponent(out Scp079TierManager tierManager)
+                    if (player.Role.Base is Scp079Role scp079Role && scp079Role.SubroutineModule.TryGetComponent(out Scp079TierManager tierManager)
                                                                  && scp079Role.SubroutineModule.TryGetSubroutine(out Scp079AuxManager energyManager))
                     {
                         MainHandler.ReplacingPlayers.Add(replacement, new AFKData

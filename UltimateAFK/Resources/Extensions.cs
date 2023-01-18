@@ -1,10 +1,10 @@
 using System.Collections.Generic;
 using System.Linq;
+using Exiled.API.Features;
 using InventorySystem;
 using InventorySystem.Items;
 using InventorySystem.Items.Firearms;
 using InventorySystem.Items.Firearms.Attachments;
-using PluginAPI.Core;
 using UnityEngine;
 
 namespace UltimateAFK.Resources
@@ -29,7 +29,7 @@ namespace UltimateAFK.Resources
         {
             foreach (var ammoItem in ammo)
             {
-                ply.SetAmmo(ammoItem.Key, ammoItem.Value);
+                ply.ReferenceHub.inventory.ServerSetAmmo(ammoItem.Key, ammoItem.Value);
             }
         }
         
@@ -54,11 +54,11 @@ namespace UltimateAFK.Resources
         /// <param name="ply"></param>
         public static void ApplyAttachments(this Player ply)
         {
-            var item = ply.Items.Where(i => i is Firearm);
+            var item = ply.ReferenceHub.inventory.UserInventory.Items.Where(i => i.Value is Firearm).ToArray();
 
             foreach (var fire in item)
             {
-                if (fire is Firearm fireArm)
+                if (fire.Value is Firearm fireArm)
                 {
                     if (AttachmentsServerHandler.PlayerPreferences.TryGetValue(ply.ReferenceHub, out var value) && value.TryGetValue(fireArm.ItemTypeId, out var value2))
                         fireArm.ApplyAttachmentsCode(value2, reValidate: true);
@@ -73,11 +73,11 @@ namespace UltimateAFK.Resources
 
         public static void ReloadAllWeapons(this Player ply)
         {
-            var item = ply.Items.Where(i => i is Firearm);
+            var item = ply.ReferenceHub.inventory.UserInventory.Items.Where(i => i.Value is Firearm).ToArray();
 
             foreach (var weapon  in item)
             {
-                if (weapon is Firearm firearm)
+                if (weapon.Value is Firearm firearm)
                 {
                     firearm.Status = new FirearmStatus(firearm.AmmoManagerModule.MaxAmmo, firearm.Status.Flags,
                         firearm.GetCurrentAttachmentsCode());

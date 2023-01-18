@@ -1,41 +1,60 @@
 ﻿using System.Collections.Generic;
+using Exiled.API.Enums;
+using Exiled.API.Features;
+using System;
+using Exiled.Events.EventArgs.Player;
 using GameCore;
-using PluginAPI.Core;
-using PluginAPI.Core.Attributes;
-using PluginAPI.Enums;
 using UltimateAFK.Handlers;
 using UltimateAFK.Resources;
-using Log = PluginAPI.Core.Log;
+using Version = System.Version;
+using Server = Exiled.Events.Handlers.Server;
+using Player = Exiled.Events.Handlers.Player;
 
 namespace UltimateAFK
 {
     /// <summary>
     /// Main class where all the handlers are loaded.
     /// </summary>
-    public class UltimateAFK
+    public class UltimateAFK : Plugin<Config>
     {
         public static UltimateAFK Singleton;
-
-        [PluginConfig] public Config Config;
+        public override string Author { get; } = "SrLicht";
+        public override string Name { get; } = "Ultimate-AFK";
+        public override string Prefix { get; } = "ultimate_afk";
         
-        [PluginPriority(LoadPriority.High)]
-        [PluginEntryPoint("UltimateAFK", "6.1.0", "Checks if a player is afk for too long and if detected as afk will be replaced by a spectator.", "SrLicht")]
-        void OnEnabled()
+        public override Version Version { get; } = new Version(6, 1, 0);
+        public override Version RequiredExiledVersion { get; } = new Version(6, 0, 0);
+        public MainHandler MainHandler { get; private set; }
+        
+        public override void OnEnabled()
         {
             Singleton = this;
-            PluginAPI.Events.EventManager.RegisterEvents(this, new Handlers.MainHandler(Singleton));
+            MainHandler = new MainHandler(this);
+            
             if (ConfigFile.ServerConfig.GetInt("afk_time") > 0)
             {
-                Log.Warning($"You have enabled the AFK detector of the base game, please disable it by setting &6afk_time = 0&r in &4config_gameplay.txt&r");
+                Exiled.API.Features.Log.Warn($"You have enabled the AFK detector of the base game, please disable it by setting &6afk_time = 0&r in &4config_gameplay.txt&r");
             }
-            //PluginAPI.Events.EventManager.RegisterEvents<Handlers.Components.AfkComponent>(this);
+
+            Player.ChangingRole += MainHandler.OnChangingRole;
+            Player.Verified += MainHandler.OnPlayerJoin;
+            Player.Dying += MainHandler.OnPlayerDeath;
+            Server.WaitingForPlayers += MainHandler.OnWaitingForPlayers;
+            
+            base.OnEnabled();
         }
 
-        [PluginUnload]
-        void OnDisable()
+        public override void OnDisabled()
         {
             MainHandler.ReplacingPlayers.Clear();
             MainHandler.ReplacingPlayers = null;
+            
+            Player.ChangingRole -= MainHandler.OnChangingRole;
+            Player.Verified -= MainHandler.OnPlayerJoin;
+            Player.Dying -= MainHandler.OnPlayerDeath;
+            Server.WaitingForPlayers -= MainHandler.OnWaitingForPlayers;
+            MainHandler = null;
+            base.OnDisabled();
         }
     }
 }

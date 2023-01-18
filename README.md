@@ -14,9 +14,7 @@ This plugin allows AFK players to be replaced by players who are in spectator, t
 If you give a group the `uafk.ignore` permission the player will be ignored to replace a player and will also never be detected as AFK. Useful for administrators
 
 # Installation
-**This plugin only works in [NwPluginAPI](https://github.com/northwood-studios/NwPluginAPI)**
+**This branch only works on Exiled 6.0.0-beta.24 or higher.**
 
-**You need [NWAPIPermissionSystem](https://github.com/CedModV2/NWAPIPermissionSystem) for this plugin to work.**
-
-You can install this plugin using the command ``p install SrLicht/Ultimate-AFK`` on the console or by downloading the .dll file and placing it in ``SCP Secret Laboratory/PluginAPI/plugins/global or your port``
+Download the code and compile it yourself, or you can create a fork and release a version yourself, but be nice and credit the author.
 

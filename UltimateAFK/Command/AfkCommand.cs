@@ -14,6 +14,7 @@ namespace UltimateAFK.Command
     [CommandHandler(typeof(ClientCommandHandler))]
     internal sealed class AfkCommand : ICommand
     {
+        public bool SanitizeResponse => false;
         public string Command { get; } = "afk";
         public string[] Aliases { get; } = Array.Empty<string>();
         public string Description { get; } = "By using this command you will be moved to spectator and if the server allows it a player will replace you.";

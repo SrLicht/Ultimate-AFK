@@ -23,7 +23,7 @@ namespace UltimateAFK
         /// <summary>
         /// Gets the plugin version.
         /// </summary>
-        public const string Version = "7.0.5";
+        public const string Version = "7.0.6";
 
         /// <summary>
         /// Called when loading the plugin

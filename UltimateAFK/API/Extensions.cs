@@ -12,6 +12,7 @@ using PluginAPI.Core.Attributes;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using InventorySystem.Items.Firearms.Modules;
 using UltimateAFK.API.Components;
 using UltimateAFK.API.Structs;
 
@@ -85,111 +86,111 @@ namespace UltimateAFK.API
         /// <param name="countForKicl">If this is true will be counted for kick if reach the max afk times</param>
         public static void Replace(this Player player, RoleTypeId role, bool countForKicl = false)
         {
-            if (player.TryGetComponent<AfkCheckComponent>(out var component))
+            if (!player.TryGetComponent<AfkCheckComponent>(out var component)) 
+                return;
+            
+            string ownerUserId = player.UserId;
+            int afkTimes = component.GetAfkTimes();
+
+            // Check if role is blacklisted
+            if (EntryPoint.Instance.Config.RoleTypeBlacklist?.Contains(role) == true)
             {
-                string ownerUserId = player.UserId;
-                int afkTimes = component.GetAfkTimes();
+                Log.Debug($"player {player.Nickname} ({player.UserId}) has a role that is blacklisted so he will not be searched for a replacement player", EntryPoint.Instance.Config.DebugMode);
 
-                // Check if role is blacklisted
-                if (EntryPoint.Instance.Config.RoleTypeBlacklist?.Contains(role) == true)
+                player.ClearInventory();
+                player.SetRole(RoleTypeId.Spectator);
+
+                if (EntryPoint.Instance.Config.AfkCount > -1 && countForKicl)
                 {
-                    Log.Debug($"player {player.Nickname} ({player.UserId}) has a role that is blacklisted so he will not be searched for a replacement player", EntryPoint.Instance.Config.DebugMode);
 
-                    player.ClearInventory();
+                    if (++afkTimes >= EntryPoint.Instance.Config.AfkCount)
+                    {
+                        player.SendConsoleMessage(EntryPoint.Instance.Config.MsgKick, "white");
+                        player.Kick(EntryPoint.Instance.Config.MsgKick);
+                        return;
+                    }
+                }
+
+                component.SetAfkTimes(afkTimes);
+
+                player.SendBroadcast(EntryPoint.Instance.Config.MsgFspec, 30, shouldClearPrevious: true);
+                player.SendConsoleMessage(EntryPoint.Instance.Config.MsgFspec, "white");
+                return;
+            }
+
+            // Get a replacement player
+            Player? replacement = GetReplacement(ownerUserId);
+
+            if (replacement == null)
+            {
+                if (EntryPoint.Instance.Config.DisableReplacement)
+                    Log.Debug("AFK player replacement is disabled by the plugin configuration.", EntryPoint.Instance.Config.DebugMode);
+                else
+                    Log.Debug("Unable to find replacement player, moving to spectator...", EntryPoint.Instance.Config.DebugMode);
+
+                player.ClearInventory();
+
+                if (player.IsSCP)
+                    player.ReferenceHub.roleManager.ServerSetRole(RoleTypeId.Spectator, RoleChangeReason.RemoteAdmin, RoleSpawnFlags.None);
+                else
                     player.SetRole(RoleTypeId.Spectator);
 
-                    if (EntryPoint.Instance.Config.AfkCount > -1 && countForKicl)
-                    {
-
-                        if (++afkTimes >= EntryPoint.Instance.Config.AfkCount)
-                        {
-                            player.SendConsoleMessage(EntryPoint.Instance.Config.MsgKick, "white");
-                            player.Kick(EntryPoint.Instance.Config.MsgKick);
-                            return;
-                        }
-                    }
-
-                    component.SetAfkTimes(afkTimes);
-
-                    player.SendBroadcast(EntryPoint.Instance.Config.MsgFspec, 30, shouldClearPrevious: true);
-                    player.SendConsoleMessage(EntryPoint.Instance.Config.MsgFspec, "white");
-                    return;
-                }
-
-                // Get a replacement player
-                Player? replacement = GetReplacement(ownerUserId);
-
-                if (replacement == null)
+                if (EntryPoint.Instance.Config.AfkCount > -1 && countForKicl)
                 {
-                    if (EntryPoint.Instance.Config.DisableReplacement)
-                        Log.Debug("AFK player replacement is disabled by the plugin configuration.", EntryPoint.Instance.Config.DebugMode);
-                    else
-                        Log.Debug("Unable to find replacement player, moving to spectator...", EntryPoint.Instance.Config.DebugMode);
+                    afkTimes++;
 
-                    player.ClearInventory();
-
-                    if (player.IsSCP)
-                        player.ReferenceHub.roleManager.ServerSetRole(RoleTypeId.Spectator, RoleChangeReason.RemoteAdmin, RoleSpawnFlags.None);
-                    else
-                        player.SetRole(RoleTypeId.Spectator);
-
-                    if (EntryPoint.Instance.Config.AfkCount > -1 && countForKicl)
+                    if (afkTimes >= EntryPoint.Instance.Config.AfkCount)
                     {
-                        afkTimes++;
+                        player.SendConsoleMessage(EntryPoint.Instance.Config.MsgKick, "white");
 
-                        if (afkTimes >= EntryPoint.Instance.Config.AfkCount)
-                        {
-                            player.SendConsoleMessage(EntryPoint.Instance.Config.MsgKick, "white");
+                        player.Kick(EntryPoint.Instance.Config.MsgKick);
 
-                            player.Kick(EntryPoint.Instance.Config.MsgKick);
-
-                            return;
-                        }
+                        return;
                     }
-
-                    player.SendBroadcast(EntryPoint.Instance.Config.MsgFspec, 30, shouldClearPrevious: true);
-                    player.SendConsoleMessage(EntryPoint.Instance.Config.MsgFspec, "white");
                 }
+
+                player.SendBroadcast(EntryPoint.Instance.Config.MsgFspec, 30, shouldClearPrevious: true);
+                player.SendConsoleMessage(EntryPoint.Instance.Config.MsgFspec, "white");
+            }
+            else
+            {
+                Log.Debug($"Replacement Player found: {replacement.LogName}", EntryPoint.Instance.Config.DebugMode);
+
+                SaveData(player, replacement.UserId, role is RoleTypeId.Scp079);
+
+                if (EntryPoint.Instance.Config.AfkCount > -1 && countForKicl)
+                {
+
+                    if (++afkTimes >= EntryPoint.Instance.Config.AfkCount)
+                    {
+                        player.ClearInventory();
+                        player.SendConsoleMessage(EntryPoint.Instance.Config.MsgKick, "white");
+                        player.Kick(EntryPoint.Instance.Config.MsgKick);
+                        replacement.SetRole(role);
+                        return;
+                    }
+                }
+
+                component.SetAfkTimes(afkTimes);
+                Log.Debug($"Cleaning player {player.Nickname} inventory", EntryPoint.Instance.Config.DebugMode);
+                // Clear player inventory
+                player.ClearInventory();
+                //Send player a broadcast for being too long afk
+                player.SendBroadcast(EntryPoint.Instance.Config.MsgFspec, 25, shouldClearPrevious: true);
+                player.SendConsoleMessage(EntryPoint.Instance.Config.MsgFspec, "white");
+
+                // Sends replacement to the role that had the afk
+                Log.Debug($"Changing replacement player {replacement.LogName} role to {role}", EntryPoint.Instance.Config.DebugMode);
+                replacement.SetRole(role);
+                // Sends player to spectator
+                Log.Debug($"Changing player {player.Nickname} to spectator", EntryPoint.Instance.Config.DebugMode);
+
+                if (player.IsSCP)
+                    player.ReferenceHub.roleManager.ServerSetRole(RoleTypeId.Spectator, RoleChangeReason.RemoteAdmin, RoleSpawnFlags.None);
                 else
-                {
-                    Log.Debug($"Replacement Player found: {replacement.LogName}", EntryPoint.Instance.Config.DebugMode);
+                    player.SetRole(RoleTypeId.Spectator);
 
-                    SaveData(player, replacement.UserId, role is RoleTypeId.Scp079);
-
-                    if (EntryPoint.Instance.Config.AfkCount > -1 && countForKicl)
-                    {
-
-                        if (++afkTimes >= EntryPoint.Instance.Config.AfkCount)
-                        {
-                            player.ClearInventory();
-                            player.SendConsoleMessage(EntryPoint.Instance.Config.MsgKick, "white");
-                            player.Kick(EntryPoint.Instance.Config.MsgKick);
-                            replacement.SetRole(role);
-                            return;
-                        }
-                    }
-
-                    component.SetAfkTimes(afkTimes);
-                    Log.Debug($"Cleaning player {player.Nickname} inventory", EntryPoint.Instance.Config.DebugMode);
-                    // Clear player inventory
-                    player.ClearInventory();
-                    //Send player a broadcast for being too long afk
-                    player.SendBroadcast(EntryPoint.Instance.Config.MsgFspec, 25, shouldClearPrevious: true);
-                    player.SendConsoleMessage(EntryPoint.Instance.Config.MsgFspec, "white");
-
-                    // Sends replacement to the role that had the afk
-                    Log.Debug($"Changing replacement player {replacement.LogName} role to {role}", EntryPoint.Instance.Config.DebugMode);
-                    replacement.SetRole(role);
-                    // Sends player to spectator
-                    Log.Debug($"Changing player {player.Nickname} to spectator", EntryPoint.Instance.Config.DebugMode);
-
-                    if (player.IsSCP)
-                        player.ReferenceHub.roleManager.ServerSetRole(RoleTypeId.Spectator, RoleChangeReason.RemoteAdmin, RoleSpawnFlags.None);
-                    else
-                        player.SetRole(RoleTypeId.Spectator);
-
-                    player.SendConsoleMessage(string.Format(EntryPoint.Instance.Config.MsgReplaced, replacement.Nickname), "white");
-                }
+                player.SendConsoleMessage(string.Format(EntryPoint.Instance.Config.MsgReplaced, replacement.Nickname), "white");
             }
         }
 
@@ -238,12 +239,14 @@ namespace UltimateAFK.API
         {
             var item = ply.Items.Where(i => i is Firearm);
 
-            foreach (var weapon in item)
+            foreach (ItemBase? weapon in item)
             {
-                if (weapon is Firearm firearm)
+                if (weapon is not Firearm firearm) 
+                    continue;
+                
+                if (firearm.Modules.FirstOrDefault(m => m is MagazineModule) is MagazineModule magazineModule)
                 {
-                    firearm.Status = new FirearmStatus(firearm.AmmoManagerModule.MaxAmmo, firearm.Status.Flags,
-                        firearm.Status.Attachments);
+                    magazineModule.AmmoStored = magazineModule.AmmoMax;
                 }
             }
         }
@@ -270,20 +273,13 @@ namespace UltimateAFK.API
         {
             var item = ply.Items.Where(i => i is Firearm);
 
-            foreach (var fire in item)
+            foreach (ItemBase? fire in item)
             {
-                if (fire is Firearm fireArm)
-                {
-                    if (AttachmentsServerHandler.PlayerPreferences.TryGetValue(ply.ReferenceHub, out var value) && value.TryGetValue(fireArm.ItemTypeId, out var value2))
-                        fireArm.ApplyAttachmentsCode(value2, reValidate: true);
-
-                    var firearmStatusFlags = FirearmStatusFlags.MagazineInserted;
-
-                    if (fireArm.HasAdvantageFlag(AttachmentDescriptiveAdvantages.Flashlight))
-                        firearmStatusFlags |= FirearmStatusFlags.FlashlightEnabled;
-
-                    fireArm.Status = new FirearmStatus(fireArm.AmmoManagerModule.MaxAmmo, firearmStatusFlags, fireArm.GetCurrentAttachmentsCode());
-                }
+                if (fire is not Firearm fireArm) 
+                    continue;
+                
+                if (AttachmentsServerHandler.PlayerPreferences.TryGetValue(ply.ReferenceHub, out var value) && value.TryGetValue(fireArm.ItemTypeId, out var value2))
+                    fireArm.ApplyAttachmentsCode(value2, reValidate: true);
             }
         }
 
@@ -308,9 +304,8 @@ namespace UltimateAFK.API
         /// </summary>
         /// <param name="elevator"></param>
         /// <returns></returns>
-        public static bool IsMoving(this ElevatorChamber elevator) => elevator._curSequence is ElevatorChamber.ElevatorSequence.MovingAway or ElevatorChamber.ElevatorSequence.Arriving;
-
-
+        public static bool IsMoving(this ElevatorChamber elevator) => elevator.CurSequence is ElevatorChamber.ElevatorSequence.MovingAway or ElevatorChamber.ElevatorSequence.Arriving;
+        
         /// <summary>
         /// Gets the player to be used as a replacement, typically the longest-active spectator.
         /// </summary>
@@ -361,43 +356,38 @@ namespace UltimateAFK.API
         private static bool IgnorePlayer(Player player, string ownerUserId)
         {
             // Check various conditions to determine if the player should be ignored
-            if (!player.IsReady ||                            // Player is not ready
-                EntryPoint.Instance.Config.UserIdIgnored.Contains(ownerUserId) ||   // Player's user ID is in the ignored list
-                player.TemporaryData.StoredData.ContainsKey("uafk_disable") ||   // Player has AFK checking disabled
-                player.UserId == ownerUserId ||                // Player is the same as the owner
-                player.IsAlive ||                              // Player is alive
-                player.CheckPermission("uafk.ignore") ||      // Player has the uafk.ignore permission
-                player.IsServer ||                             // Player is a server
-                player.UserId.Contains("@server") ||           // Player's user ID contains "@server"
-                player.UserId.Contains("@npc") ||              // Player's user ID contains "@npc"
-                MainHandler.ReplacingPlayersData.TryGetValue(player.UserId, out _))  // Player is being replaced
-            {
-                return true;
-            }
-
-            return false;
+            return !player.IsReady || // Player is not ready
+                   EntryPoint.Instance.Config.UserIdIgnored.Contains(ownerUserId) || // Player's user ID is in the ignored list
+                   player.TemporaryData.StoredData.ContainsKey("uafk_disable") || // Player has AFK checking disabled
+                   player.UserId == ownerUserId || // Player is the same as the owner
+                   player.IsAlive || // Player is alive
+                   player.CheckPermission("uafk.ignore") || // Player has the uafk.ignore permission
+                   player.IsServer || // Player is a server
+                   player.UserId.Contains("@server") || // Player's user ID contains "@server"
+                   player.UserId.Contains("@npc") || // Player's user ID contains "@npc"
+                   MainHandler.ReplacingPlayersData.TryGetValue(player.UserId, out _); // Player is being replaced
         }
 
-        private static void SaveData(Player Owner, string replacementUserId, bool isScp079 = false)
+        private static void SaveData(Player owner, string replacementUserId, bool isScp079 = false)
         {
             AfkData data;
 
             if (isScp079)
             {
-                if (Owner.RoleBase is Scp079Role scp079Role && scp079Role.SubroutineModule.TryGetSubroutine(out Scp079TierManager tierManager)
+                if (owner.RoleBase is Scp079Role scp079Role && scp079Role.SubroutineModule.TryGetSubroutine(out Scp079TierManager tierManager)
                     && scp079Role.SubroutineModule.TryGetSubroutine(out Scp079AuxManager energyManager))
                 {
-                    data = new AfkData(Owner.Nickname, Owner.Position, Owner.Role, null, new(), Owner.Health, new(tierManager.TotalExp, energyManager.CurrentAux));
+                    data = new AfkData(owner.Nickname, owner.Position, owner.Role, null, new(), owner.Health, new(tierManager.TotalExp, energyManager.CurrentAux));
                 }
                 else
                 {
                     // SCP-079 data cannot be obtained
-                    data = new AfkData(Owner.Nickname, Owner.Position, Owner.Role, null, new(), Owner.Health, null);
+                    data = new AfkData(owner.Nickname, owner.Position, owner.Role, null, new(), owner.Health, null);
                 }
             }
             else
             {
-                data = new AfkData(Owner.Nickname, Owner.Position, Owner.Role, Owner.GetAmmo(), Owner.GetItemTypes(), Owner.Health, null);
+                data = new AfkData(owner.Nickname, owner.Position, owner.Role, owner.GetAmmo(), owner.GetItemTypes(), owner.Health, null);
             }
 
             MainHandler.ReplacingPlayersData.Add(replacementUserId, data);
